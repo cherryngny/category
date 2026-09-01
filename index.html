@@ -145,16 +145,9 @@
 
         .options-grid {
             display: grid;
+            grid-template-columns: repeat(2, 1fr);
             gap: 12px;
             margin-bottom: 16px;
-        }
-
-        .options-grid.cols-3 {
-            grid-template-columns: repeat(3, 1fr);
-        }
-
-        .options-grid.cols-4 {
-            grid-template-columns: repeat(2, 1fr);
         }
 
         .option-card {
@@ -238,9 +231,9 @@
     <!-- SETUP SCREEN -->
     <div id="setup-screen" class="card">
         <div class="level-selector">
-            <button id="lvl-1-btn" class="level-tab active" onclick="selectLevel(1)">關卡 1 (3選1)<br>Level 1</button>
-            <button id="lvl-2-btn" class="level-tab" onclick="selectLevel(2)">關卡 2 (4選1)<br>Level 2</button>
-            <button id="lvl-3-btn" class="level-tab" onclick="selectLevel(3)">關卡 3 (隨機)<br>Level 3</button>
+            <button id="lvl-1-btn" class="level-tab active" onclick="selectLevel(1)">關卡 1 (1個類別)<br>Level 1</button>
+            <button id="lvl-2-btn" class="level-tab" onclick="selectLevel(2)">關卡 2 (2個類別)<br>Level 2</button>
+            <button id="lvl-3-btn" class="level-tab" onclick="selectLevel(3)">關卡 3 (3個類別)<br>Level 3</button>
         </div>
 
         <h2 id="setup-instruction" style="margin: 0 0 4px 0; font-size: 1.1rem;">請選擇 1 個目標類別</h2>
@@ -254,30 +247,30 @@
     <!-- GAMEPLAY SCREEN -->
     <div id="game-screen" class="card hidden">
         <div class="status-bar">
-            <span>進度 Trial: <span id="trial-count">1</span> / 8</span>
+            <span>進度 Trial: <span id="trial-count">1</span> / <span id="total-trials-count">8</span></span>
             <span id="level-indicator">Level 1</span>
         </div>
 
         <div class="prompt-box">
-            找出哪一個是「奇特/不屬於同類的物品」！<br>
+            找出哪一個是「不屬於同類的物品」！<br>
             <span style="font-size: 0.85rem; font-weight: normal; color: #475569;">Find the odd one out!</span>
         </div>
 
         <div class="options-grid" id="options-container"></div>
 
-        <!-- PROCEED BUTTON (UNDER OPTIONS) -->
+        <!-- PROCEED BUTTON -->
         <button id="proceed-btn" class="btn hidden" onclick="nextTrial()">繼續 Proceed</button>
     </div>
 
     <!-- SUMMARY SCREEN -->
     <div id="summary-screen" class="card hidden">
         <h2 style="color: var(--secondary); margin-top: 0;">🎉 完成練習！ Round Finished!</h2>
-        <p style="font-size: 1.2rem; font-weight: bold;">得分 Score: <span id="final-score">0</span> / 8</p>
+        <p style="font-size: 1.2rem; font-weight: bold;">得分 Score: <span id="final-score">0</span> / <span id="summary-total-trials">8</span></p>
         <button class="btn" onclick="resetGame()">再玩一次 Play Again</button>
     </div>
 
     <script>
-        // 16 Categories with 8 items each (1.png to 128.png)
+        // 16 Categories with 8 items each
         const CATEGORIES = [
             { id: 'cat1',  name: '動物',     items: ['1.png', '2.png', '3.png', '4.png', '5.png', '6.png', '7.png', '8.png'] },
             { id: 'cat2',  name: '食物',     items: ['9.png', '10.png', '11.png', '12.png', '13.png', '14.png', '15.png', '16.png'] },
@@ -297,7 +290,7 @@
             { id: 'cat16', name: '運動',     items: ['121.png', '122.png', '123.png', '124.png', '125.png', '126.png', '127.png', '128.png'] }
         ];
 
-        // Web Audio Synthesizer
+        // Synthesizer Audio
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         function playSound(type) {
             if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -314,7 +307,6 @@
                 gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
                 osc.start(now); osc.stop(now + 0.35);
             } else if (type === 'didi') {
-                // Dual tone "Di-Di" error sound
                 osc.type = 'sawtooth';
                 osc.frequency.setValueAtTime(150, now);
                 osc.frequency.setValueAtTime(120, now + 0.12);
@@ -328,6 +320,7 @@
         let currentLevel = 1;
         let selectedCategoryIds = [];
         let currentTrial = 0;
+        let totalTrials = 8;
         let score = 0;
         let trialsData = [];
         let attemptsLeft = 2;
@@ -348,12 +341,15 @@
             const instr = document.getElementById('setup-instruction');
             const subInstr = document.getElementById('setup-subinstruction');
 
-            if (lvl === 3) {
-                instr.innerText = "請選擇 3 個目標類別";
-                subInstr.innerText = "Select 3 target categories";
-            } else {
+            if (lvl === 1) {
                 instr.innerText = "請選擇 1 個目標類別";
                 subInstr.innerText = "Select 1 target category";
+            } else if (lvl === 2) {
+                instr.innerText = "請選擇 2 個目標類別";
+                subInstr.innerText = "Select 2 target categories";
+            } else {
+                instr.innerText = "請選擇 3 個目標類別";
+                subInstr.innerText = "Select 3 target categories";
             }
 
             renderCategoryGrid();
@@ -375,7 +371,7 @@
 
         function toggleCategorySelection(catId, element) {
             const index = selectedCategoryIds.indexOf(catId);
-            const requiredCount = currentLevel === 3 ? 3 : 1;
+            const requiredCount = currentLevel; // L1: 1, L2: 2, L3: 3
 
             if (index > -1) {
                 selectedCategoryIds.splice(index, 1);
@@ -398,13 +394,14 @@
 
         function updateStartButton() {
             const startBtn = document.getElementById('start-btn');
-            const requiredCount = currentLevel === 3 ? 3 : 1;
-            startBtn.disabled = selectedCategoryIds.length !== requiredCount;
+            startBtn.disabled = selectedCategoryIds.length !== currentLevel;
         }
 
         function startGame() {
             currentTrial = 0;
             score = 0;
+            totalTrials = currentLevel === 1 ? 8 : 10;
+
             generateTrialsData();
 
             document.getElementById('setup-screen').classList.add('hidden');
@@ -416,29 +413,42 @@
 
         function generateTrialsData() {
             trialsData = [];
-            
-            for (let i = 0; i < 8; i++) {
-                let targetCategory;
-                if (currentLevel === 3) {
-                    const randomCatId = selectedCategoryIds[Math.floor(Math.random() * selectedCategoryIds.length)];
-                    targetCategory = CATEGORIES.find(c => c.id === randomCatId);
-                } else {
-                    targetCategory = CATEGORIES.find(c => c.id === selectedCategoryIds[0]);
-                }
+            let targetCategorySequence = [];
 
-                // Pick target item (the odd one out)
+            if (currentLevel === 1) {
+                // 8 trials all targeting chosen Category 1
+                const cat1 = CATEGORIES.find(c => c.id === selectedCategoryIds[0]);
+                for (let i = 0; i < 8; i++) targetCategorySequence.push(cat1);
+            } else if (currentLevel === 2) {
+                // 5 trials for Category 1, 5 trials for Category 2
+                const cat1 = CATEGORIES.find(c => c.id === selectedCategoryIds[0]);
+                const cat2 = CATEGORIES.find(c => c.id === selectedCategoryIds[1]);
+                for (let i = 0; i < 5; i++) {
+                    targetCategorySequence.push(cat1);
+                    targetCategorySequence.push(cat2);
+                }
+                targetCategorySequence = shuffleArray(targetCategorySequence);
+            } else if (currentLevel === 3) {
+                // 10 randomized trials across 3 categories
+                const selectedCats = selectedCategoryIds.map(id => CATEGORIES.find(c => c.id === id));
+                for (let i = 0; i < 10; i++) {
+                    const randomCat = selectedCats[Math.floor(Math.random() * selectedCats.length)];
+                    targetCategorySequence.push(randomCat);
+                }
+            }
+
+            // Build individual trials
+            targetCategorySequence.forEach(targetCategory => {
                 const targetImg = targetCategory.items[Math.floor(Math.random() * targetCategory.items.length)];
 
-                // Pick ONE SINGLE distractor category (different from targetCategory)
+                // Pick distractor category
                 const availableDistractorCats = CATEGORIES.filter(c => c.id !== targetCategory.id);
                 const distractorCategory = availableDistractorCats[Math.floor(Math.random() * availableDistractorCats.length)];
 
-                // Pick 2 distractors (L1) or 3 distractors (L2 & L3) ALL from the same distractorCategory
-                const distractorCount = currentLevel === 1 ? 2 : 3;
+                // 3 distractors from same category
                 const shuffledDistractorItems = shuffleArray(distractorCategory.items);
-                const distractors = shuffledDistractorItems.slice(0, distractorCount);
+                const distractors = shuffledDistractorItems.slice(0, 3);
 
-                // Combine options and randomize display order
                 const options = shuffleArray([
                     { img: targetImg, isOdd: true },
                     ...distractors.map(img => ({ img: img, isOdd: false }))
@@ -448,7 +458,7 @@
                     targetCategory: targetCategory,
                     options: options
                 });
-            }
+            });
         }
 
         function loadTrial() {
@@ -456,11 +466,11 @@
             isTrialFinished = false;
             
             document.getElementById('trial-count').innerText = currentTrial + 1;
+            document.getElementById('total-trials-count').innerText = totalTrials;
             document.getElementById('level-indicator').innerText = `Level ${currentLevel}`;
             document.getElementById('proceed-btn').classList.add('hidden');
 
             const container = document.getElementById('options-container');
-            container.className = `options-grid ${currentLevel === 1 ? 'cols-3' : 'cols-4'}`;
             container.innerHTML = '';
 
             const data = trialsData[currentTrial];
@@ -477,42 +487,30 @@
 
         function handleChoice(cardElement, isOdd) {
             if (isTrialFinished || cardElement.classList.contains('incorrect-selected')) {
-                return; // Prevent clicking completed or previously wrong cards
+                return;
             }
 
             if (isOdd) {
-                // CORRECT SELECTION
                 isTrialFinished = true;
-                if (attemptsLeft === 2) score++; // First try bonus score
+                if (attemptsLeft === 2) score++;
                 
                 cardElement.classList.add('correct-selected');
                 playSound('correct');
 
-                // Confetti celebration (彩帶)
                 if (typeof confetti === 'function') {
-                    confetti({
-                        particleCount: 60,
-                        spread: 60,
-                        origin: { y: 0.7 }
-                    });
+                    confetti({ particleCount: 60, spread: 60, origin: { y: 0.7 } });
                 }
 
-                // Reveal proceed button underneath images
                 document.getElementById('proceed-btn').classList.remove('hidden');
 
             } else {
-                // INCORRECT SELECTION
                 attemptsLeft--;
                 cardElement.classList.add('incorrect-selected');
                 playSound('didi');
 
-                if (attemptsLeft === 1) {
-                    // Give 1 more chance to click again
-                } else if (attemptsLeft <= 0) {
-                    // Still incorrect on 2nd attempt -> Finish trial and pop up correct answer highlight
+                if (attemptsLeft <= 0) {
                     isTrialFinished = true;
 
-                    // Locate and highlight the correct card
                     const allCards = document.querySelectorAll('.option-card');
                     allCards.forEach(card => {
                         if (card.dataset.isOdd === 'true') {
@@ -520,7 +518,6 @@
                         }
                     });
 
-                    // Reveal proceed button underneath images
                     document.getElementById('proceed-btn').classList.remove('hidden');
                 }
             }
@@ -529,7 +526,7 @@
         function nextTrial() {
             currentTrial++;
 
-            if (currentTrial < 8) {
+            if (currentTrial < totalTrials) {
                 loadTrial();
             } else {
                 endGame();
@@ -540,8 +537,10 @@
             document.getElementById('game-screen').classList.add('hidden');
             document.getElementById('summary-screen').classList.remove('hidden');
             document.getElementById('final-score').innerText = score;
+            document.getElementById('summary-total-trials').innerText = totalTrials;
 
-            if (score >= 6 && typeof confetti === 'function') {
+            const passingScore = totalTrials * 0.75;
+            if (score >= passingScore && typeof confetti === 'function') {
                 confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
             }
         }
