@@ -56,7 +56,7 @@
             padding: 20px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
             width: 100%;
-            max-width: 550px;
+            max-width: 600px;
             text-align: center;
         }
 
@@ -219,6 +219,63 @@
             cursor: not-allowed;
             box-shadow: none;
         }
+
+        .btn-danger {
+            background: var(--danger);
+            margin-top: 10px;
+            padding: 8px 16px;
+            font-size: 0.85rem;
+            width: auto;
+        }
+
+        /* Data Tracker Table Styles */
+        .tracker-container {
+            margin-top: 24px;
+            border-top: 2px dashed #CBD5E1;
+            padding-top: 16px;
+            text-align: left;
+        }
+
+        .tracker-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #334155;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .table-wrapper {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #E2E8F0;
+            border-radius: 8px;
+        }
+
+        .tracker-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            background: #F8FAFC;
+        }
+
+        .tracker-table th, .tracker-table td {
+            padding: 8px 10px;
+            border-bottom: 1px solid #E2E8F0;
+            text-align: center;
+        }
+
+        .tracker-table th {
+            background: #EDF2F7;
+            color: #475569;
+            position: sticky;
+            top: 0;
+        }
+
+        .tracker-table tr:nth-child(even) {
+            background: #FFFFFF;
+        }
     </style>
 </head>
 <body>
@@ -228,7 +285,6 @@
         <p class="subtitle">Find the Odd One Out</p>
     </header>
 
-    <!-- SETUP SCREEN -->
     <div id="setup-screen" class="card">
         <div class="level-selector">
             <button id="lvl-1-btn" class="level-tab active" onclick="selectLevel(1)">關卡 1 (1個類別)<br>Level 1</button>
@@ -244,7 +300,6 @@
         <button id="start-btn" class="btn" disabled onclick="startGame()">開始遊戲 Start Game</button>
     </div>
 
-    <!-- GAMEPLAY SCREEN -->
     <div id="game-screen" class="card hidden">
         <div class="status-bar">
             <span>進度 Trial: <span id="trial-count">1</span> / <span id="total-trials-count">8</span></span>
@@ -258,15 +313,37 @@
 
         <div class="options-grid" id="options-container"></div>
 
-        <!-- PROCEED BUTTON -->
         <button id="proceed-btn" class="btn hidden" onclick="nextTrial()">繼續 Proceed</button>
     </div>
 
-    <!-- SUMMARY SCREEN -->
     <div id="summary-screen" class="card hidden">
         <h2 style="color: var(--secondary); margin-top: 0;">🎉 完成練習！ Round Finished!</h2>
         <p style="font-size: 1.2rem; font-weight: bold;">得分 Score: <span id="final-score">0</span> / <span id="summary-total-trials">8</span></p>
         <button class="btn" onclick="resetGame()">再玩一次 Play Again</button>
+
+        <div class="tracker-container">
+            <div class="tracker-title">
+                📊 學習數據記錄 Data Tracker
+            </div>
+            <div class="table-wrapper">
+                <table class="tracker-table">
+                    <thead>
+                        <tr>
+                            <th>時間 Time</th>
+                            <th>關卡 Level</th>
+                            <th>目標類別 Categories</th>
+                            <th>得分 Score</th>
+                            <th>正確率 Accuracy</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tracker-history">
+                        </tbody>
+                </table>
+            </div>
+            <div style="text-align: right;">
+                <button class="btn btn-danger" onclick="clearHistory()">清除記錄 Clear History</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -416,11 +493,9 @@
             let targetCategorySequence = [];
 
             if (currentLevel === 1) {
-                // 8 trials all targeting chosen Category 1
                 const cat1 = CATEGORIES.find(c => c.id === selectedCategoryIds[0]);
                 for (let i = 0; i < 8; i++) targetCategorySequence.push(cat1);
             } else if (currentLevel === 2) {
-                // 5 trials for Category 1, 5 trials for Category 2
                 const cat1 = CATEGORIES.find(c => c.id === selectedCategoryIds[0]);
                 const cat2 = CATEGORIES.find(c => c.id === selectedCategoryIds[1]);
                 for (let i = 0; i < 5; i++) {
@@ -429,7 +504,6 @@
                 }
                 targetCategorySequence = shuffleArray(targetCategorySequence);
             } else if (currentLevel === 3) {
-                // 10 randomized trials across 3 categories
                 const selectedCats = selectedCategoryIds.map(id => CATEGORIES.find(c => c.id === id));
                 for (let i = 0; i < 10; i++) {
                     const randomCat = selectedCats[Math.floor(Math.random() * selectedCats.length)];
@@ -543,6 +617,54 @@
             if (score >= passingScore && typeof confetti === 'function') {
                 confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
             }
+
+            // Save and render game session logs
+            saveGameRecord();
+            renderTrackerHistory();
+        }
+
+        function saveGameRecord() {
+            const now = new Date();
+            const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+            const selectedNames = selectedCategoryIds.map(id => CATEGORIES.find(c => c.id === id).name).join(', ');
+            const accuracy = Math.round((score / totalTrials) * 100);
+
+            const record = {
+                time: timeStr,
+                level: `L${currentLevel}`,
+                categories: selectedNames,
+                score: `${score}/${totalTrials}`,
+                accuracy: `${accuracy}%`
+            };
+
+            let history = JSON.parse(localStorage.getItem('odd_one_out_history') || '[]');
+            history.unshift(record); // Add latest game to top
+            localStorage.setItem('odd_one_out_history', JSON.stringify(history));
+        }
+
+        function renderTrackerHistory() {
+            const tbody = document.getElementById('tracker-history');
+            const history = JSON.parse(localStorage.getItem('odd_one_out_history') || '[]');
+            
+            if (history.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" style="color: #94A3B8;">暫無紀錄 No records found</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = history.map(item => `
+                <tr>
+                    <td>${item.time}</td>
+                    <td><strong>${item.level}</strong></td>
+                    <td>${item.categories}</td>
+                    <td>${item.score}</td>
+                    <td style="color: ${parseInt(item.accuracy) >= 75 ? 'var(--secondary)' : 'var(--danger)'}; font-weight: bold;">${item.accuracy}</td>
+                </tr>
+            `).join('');
+        }
+
+        function clearHistory() {
+            localStorage.removeItem('odd_one_out_history');
+            renderTrackerHistory();
         }
 
         function resetGame() {
